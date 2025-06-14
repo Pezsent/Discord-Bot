@@ -1,5 +1,6 @@
 // Load environment variables from .env file
 require('dotenv').config();
+console.log('Token from .env:', process.env.DISCORD_BOT_TOKEN ? '[TOKEN SET]' : '[NO TOKEN]');
 
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const express = require('express');
