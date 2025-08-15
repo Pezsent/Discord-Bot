@@ -27,6 +27,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.DirectMessages, // <--- Added to detect DMs
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
@@ -54,18 +55,19 @@ const cooldowns = {
 const COOLDOWN_MS = 5 * 60 * 1000;
 
 client.on('messageCreate', async (message) => {
+  // ===== Shutdown command =====
+  if (message.content === '!shutdown' && message.author.id === OWNER_ID) {
+    console.log('Shutdown command received from owner. Closing bot...');
+    await message.channel.send('🛑 Shutting down bot...');
+    process.exit(0); // stops the bot safely
+    return; // stop further code
+  }
+
   const now = Date.now();
   const channelId = message.channel.id;
   const content = message.content;
 
-  // ===== Shutdown command =====
-  if (content === '!shutdown' && message.author.id === OWNER_ID) {
-    await message.channel.send('🛑 Shutting down bot...');
-    console.log('Shutdown command received from owner. Closing bot...');
-    process.exit(0);
-  }
-
-  console.log(`[${message.channel.name || 'Unknown'}] ${message.author?.tag || 'Unknown'}: ${content}`);
+  console.log(`[${message.channel.name || 'DM'}] ${message.author?.tag || 'Unknown'}: ${content}`);
 
   // World Boss
   if (channelId === CHANNEL_IDS.worldBosses) {
