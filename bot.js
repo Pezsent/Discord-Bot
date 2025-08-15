@@ -31,6 +31,9 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
+// ===== Shutdown command owner ID from .env =====
+const OWNER_ID = process.env.OWNER_ID;
+
 const CHANNEL_IDS = {
   infernal: '1382541305720344607',
   dungeon: '1382543480848519218',
@@ -54,6 +57,13 @@ client.on('messageCreate', async (message) => {
   const now = Date.now();
   const channelId = message.channel.id;
   const content = message.content;
+
+  // ===== Shutdown command =====
+  if (content === '!shutdown' && message.author.id === OWNER_ID) {
+    await message.channel.send('🛑 Shutting down bot...');
+    console.log('Shutdown command received from owner. Closing bot...');
+    process.exit(0);
+  }
 
   console.log(`[${message.channel.name || 'Unknown'}] ${message.author?.tag || 'Unknown'}: ${content}`);
 
