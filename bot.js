@@ -27,7 +27,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.DirectMessages, // <--- Added to detect DMs
+    GatewayIntentBits.DirectMessages,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
@@ -55,17 +55,22 @@ const cooldowns = {
 const COOLDOWN_MS = 5 * 60 * 1000;
 
 client.on('messageCreate', async (message) => {
-  // ===== Shutdown command =====
-  if (message.content === '!shutdown' && message.author.id === OWNER_ID) {
-    console.log('Shutdown command received from owner. Closing bot...');
-    await message.channel.send('🛑 Shutting down bot...');
-    process.exit(0); // stops the bot safely
-    return; // stop further code
-  }
+  // Fetch partials if necessary (for DMs or deleted messages)
+  if (message.partial) await message.fetch();
 
   const now = Date.now();
   const channelId = message.channel.id;
   const content = message.content;
+
+  // ===== Shutdown command =====
+  if (content === '!shutdown' && message.author?.id === OWNER_ID) {
+    console.log('Shutdown command received from owner. Closing bot...');
+    try {
+      await message.channel.send('🛑 Shutting down bot...');
+    } catch {} // ignore errors in DMs
+    process.exit(0);
+    return; // stop further code
+  }
 
   console.log(`[${message.channel.name || 'DM'}] ${message.author?.tag || 'Unknown'}: ${content}`);
 
