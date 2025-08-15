@@ -1,6 +1,7 @@
 // Load environment variables from .env file
 require('dotenv').config();
 console.log('Token from .env:', process.env.DISCORD_BOT_TOKEN ? '[TOKEN SET]' : '[NO TOKEN]');
+console.log('Owner ID from .env:', process.env.OWNER_ID ? '[OWNER SET]' : '[NO OWNER]');
 
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const express = require('express');
@@ -8,12 +9,15 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ===== Shutdown command owner ID from .env =====
+const OWNER_ID = process.env.OWNER_ID;
+
 // ========== EXPRESS SERVER FOR UPTIME ==========
 app.get('/', (req, res) => res.send('Bot is alive!'));
 app.listen(PORT, () => console.log(`🌐 Uptime server running on port ${PORT}`));
 
-// OPTIONAL: Self-ping to keep Railway/Render active (adjust if needed)
-const SELF_PING_URL = process.env.SELF_PING_URL || 'https://your-railway-or-render-url.com';
+// OPTIONAL: Self-ping to keep Render active
+const SELF_PING_URL = process.env.SELF_PING_URL || 'https://your-render-url.com';
 setInterval(() => {
   axios.get(SELF_PING_URL)
     .then(() => console.log('🔁 Self-ping successful'))
@@ -27,13 +31,9 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.DirectMessages,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
-
-// ===== Shutdown command owner ID from .env =====
-const OWNER_ID = process.env.OWNER_ID;
 
 const CHANNEL_IDS = {
   infernal: '1382541305720344607',
@@ -55,26 +55,20 @@ const cooldowns = {
 const COOLDOWN_MS = 5 * 60 * 1000;
 
 client.on('messageCreate', async (message) => {
-  // Fetch partials if necessary (for DMs or deleted messages)
-  if (message.partial) await message.fetch();
-
   const now = Date.now();
   const channelId = message.channel.id;
-  const content = message.content;
+  const content = message.content.trim();
 
   // ===== Shutdown command =====
-  if (content === '!shutdown' && message.author?.id === OWNER_ID) {
+  if (content === '!shutdown' && message.author.id === OWNER_ID) {
+    await message.channel.send('🛑 Shutting down bot...');
     console.log('Shutdown command received from owner. Closing bot...');
-    try {
-      await message.channel.send('🛑 Shutting down bot...');
-    } catch {} // ignore errors in DMs
-    process.exit(0);
-    return; // stop further code
+    process.exit(0); // safely stops the bot
   }
 
-  console.log(`[${message.channel.name || 'DM'}] ${message.author?.tag || 'Unknown'}: ${content}`);
+  console.log(`[${message.channel.name || 'Unknown'}] ${message.author?.tag || 'Unknown'}: ${content}`);
 
-  // World Boss
+  // ===== World Boss ping =====
   if (channelId === CHANNEL_IDS.worldBosses) {
     const trigger = content.toLowerCase().includes('@world boss ping') || content.includes(`<@&${ROLE_IDS.worldBosses}>`);
     if (trigger && now > cooldowns.worldBosses) {
@@ -84,14 +78,14 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // Dungeon
+  // ===== Dungeon ping =====
   if (channelId === CHANNEL_IDS.dungeon && now > cooldowns.dungeon) {
     cooldowns.dungeon = now + COOLDOWN_MS;
     await message.channel.send(`Hey <@&${ROLE_IDS.dungeon}>! A dungeon event might have appeared!`);
     console.log(`📣 Pinged <@&${ROLE_IDS.dungeon}>`);
   }
 
-  // Infernal
+  // ===== Infernal ping =====
   if (channelId === CHANNEL_IDS.infernal && now > cooldowns.infernal) {
     cooldowns.infernal = now + COOLDOWN_MS;
     await message.channel.send(`Hey <@&${ROLE_IDS.infernal}>! An Infernal Castle might be spawning!`);
