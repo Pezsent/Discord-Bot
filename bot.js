@@ -12,8 +12,8 @@ const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot is alive!'));
 app.listen(PORT, () => console.log(`🌐 Uptime server running on port ${PORT}`));
 
-// OPTIONAL: Self-ping to keep Railway/Render active (adjust if needed)
-const SELF_PING_URL = process.env.SELF_PING_URL || 'https://your-railway-or-render-url.com';
+// OPTIONAL: Self-ping to keep Railway/Render active
+const SELF_PING_URL = process.env.SELF_PING_URL || 'https://your-render-url.com';
 setInterval(() => {
   axios.get(SELF_PING_URL)
     .then(() => console.log('🔁 Self-ping successful'))
@@ -51,34 +51,47 @@ const cooldowns = {
 const COOLDOWN_MS = 5 * 60 * 1000;
 
 client.on('messageCreate', async (message) => {
+  // Ignore bots, webhooks, and DMs
+  if (!message.guild || message.author.bot || message.webhookId) return;
+
   const now = Date.now();
   const channelId = message.channel.id;
-  const content = message.content;
+  const content = message.content.trim();
+  let pinged = false; // prevents double ping per message
 
   console.log(`[${message.channel.name || 'Unknown'}] ${message.author?.tag || 'Unknown'}: ${content}`);
 
-  // World Boss
-  if (channelId === CHANNEL_IDS.worldBosses) {
+  // ===== World Boss ping =====
+  if (!pinged && channelId === CHANNEL_IDS.worldBosses && now > cooldowns.worldBosses) {
     const trigger = content.toLowerCase().includes('@world boss ping') || content.includes(`<@&${ROLE_IDS.worldBosses}>`);
-    if (trigger && now > cooldowns.worldBosses) {
+    if (trigger) {
       cooldowns.worldBosses = now + COOLDOWN_MS;
       await message.channel.send(`Hey <@&${ROLE_IDS.worldBosses}>! Spidey just pinged your event!`);
       console.log(`📣 Pinged <@&${ROLE_IDS.worldBosses}>`);
+      pinged = true;
     }
   }
 
-  // Dungeon
-  if (channelId === CHANNEL_IDS.dungeon && now > cooldowns.dungeon) {
-    cooldowns.dungeon = now + COOLDOWN_MS;
-    await message.channel.send(`Hey <@&${ROLE_IDS.dungeon}>! A dungeon event might have appeared!`);
-    console.log(`📣 Pinged <@&${ROLE_IDS.dungeon}>`);
+  // ===== Dungeon ping =====
+  if (!pinged && channelId === CHANNEL_IDS.dungeon && now > cooldowns.dungeon) {
+    const trigger = content.toLowerCase().includes('@dungeon') || content.includes(`<@&${ROLE_IDS.dungeon}>`);
+    if (trigger) {
+      cooldowns.dungeon = now + COOLDOWN_MS;
+      await message.channel.send(`Hey <@&${ROLE_IDS.dungeon}>! A dungeon event might have appeared!`);
+      console.log(`📣 Pinged <@&${ROLE_IDS.dungeon}>`);
+      pinged = true;
+    }
   }
 
-  // Infernal
-  if (channelId === CHANNEL_IDS.infernal && now > cooldowns.infernal) {
-    cooldowns.infernal = now + COOLDOWN_MS;
-    await message.channel.send(`Hey <@&${ROLE_IDS.infernal}>! An Infernal Castle might be spawning!`);
-    console.log(`📣 Pinged <@&${ROLE_IDS.infernal}>`);
+  // ===== Infernal ping =====
+  if (!pinged && channelId === CHANNEL_IDS.infernal && now > cooldowns.infernal) {
+    const trigger = content.toLowerCase().includes('@infernal') || content.includes(`<@&${ROLE_IDS.infernal}>`);
+    if (trigger) {
+      cooldowns.infernal = now + COOLDOWN_MS;
+      await message.channel.send(`Hey <@&${ROLE_IDS.infernal}>! An Infernal Castle might be spawning!`);
+      console.log(`📣 Pinged <@&${ROLE_IDS.infernal}>`);
+      pinged = true;
+    }
   }
 });
 
