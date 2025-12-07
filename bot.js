@@ -2,7 +2,7 @@
 require('dotenv').config();
 console.log('Token from .env:', process.env.DISCORD_BOT_TOKEN ? '[TOKEN SET]' : '[NO TOKEN]');
 
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 const express = require('express');
 const axios = require('axios');
 const app = express();
@@ -27,6 +27,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildMembers, // needed for join/leave logs
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
@@ -50,160 +51,168 @@ const cooldowns = {
 };
 const COOLDOWN_MS = 5 * 60 * 1000;
 
+const LOG_CHANNEL_ID = "1447027328600379392";
+
+// Helper function for dashboard-style embeds
+function createLogEmbed({ title, description, color, footer }) {
+    return new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(description)
+        .setColor(color)
+        .setTimestamp()
+        .setFooter({ text: footer || 'Illusion Logs' });
+}
+
+// ========== DISCORD EVENTS ==========
+
+// ----- Message Create (Ping + Chat Logging) -----
 client.on('messageCreate', async (message) => {
-  // Ignore bots, webhooks, and DMs
   if (!message.guild || message.author.bot || message.webhookId) return;
 
   const now = Date.now();
   const channelId = message.channel.id;
   const content = message.content.trim();
-  let pinged = false; // prevents double ping per message
+  let pinged = false;
 
-  console.log(`[${message.channel.name || 'Unknown'}] ${message.author?.tag || 'Unknown'}: ${content}`);
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
 
-  // ===== World Boss ping =====
+  // ----- World Boss Ping -----
   if (!pinged && channelId === CHANNEL_IDS.worldBosses && now > cooldowns.worldBosses) {
     const trigger = content.toLowerCase().includes('@world boss ping') || content.includes(`<@&${ROLE_IDS.worldBosses}>`);
     if (trigger) {
       cooldowns.worldBosses = now + COOLDOWN_MS;
-      await message.channel.send(`Hey <@&${ROLE_IDS.worldBosses}>! Spidey just pinged your event!`);
+      const embed = createLogEmbed({
+        title: "📣 World Boss Ping",
+        description: `**Triggered by:** ${message.author.tag}\n**Channel:** <#${message.channel.id}>\nPing sent to <@&${ROLE_IDS.worldBosses}>!`,
+        color: 0x8A2BE2 // bright purple
+      });
+      await message.channel.send({ embeds: [embed] });
+      if (logChannel) logChannel.send({ embeds: [embed] });
       console.log(`📣 Pinged <@&${ROLE_IDS.worldBosses}>`);
       pinged = true;
     }
   }
 
-  // ===== Dungeon ping =====
+  // ----- Dungeon Ping -----
   if (!pinged && channelId === CHANNEL_IDS.dungeon && now > cooldowns.dungeon) {
     const trigger = content.toLowerCase().includes('@dungeon') || content.includes(`<@&${ROLE_IDS.dungeon}>`);
     if (trigger) {
       cooldowns.dungeon = now + COOLDOWN_MS;
-      await message.channel.send(`Hey <@&${ROLE_IDS.dungeon}>! A dungeon event might have appeared!`);
+      const embed = createLogEmbed({
+        title: "📣 Dungeon Ping",
+        description: `**Triggered by:** ${message.author.tag}\n**Channel:** <#${message.channel.id}>\nPing sent to <@&${ROLE_IDS.dungeon}>!`,
+        color: 0x7B68EE // medium purple
+      });
+      await message.channel.send({ embeds: [embed] });
+      if (logChannel) logChannel.send({ embeds: [embed] });
       console.log(`📣 Pinged <@&${ROLE_IDS.dungeon}>`);
       pinged = true;
     }
   }
 
-  // ===== Infernal ping =====
+  // ----- Infernal Ping -----
   if (!pinged && channelId === CHANNEL_IDS.infernal && now > cooldowns.infernal) {
     const trigger = content.toLowerCase().includes('@infernal') || content.includes(`<@&${ROLE_IDS.infernal}>`);
     if (trigger) {
       cooldowns.infernal = now + COOLDOWN_MS;
-      await message.channel.send(`Hey <@&${ROLE_IDS.infernal}>! An Infernal Castle might be spawning!`);
+      const embed = createLogEmbed({
+        title: "📣 Infernal Ping",
+        description: `**Triggered by:** ${message.author.tag}\n**Channel:** <#${message.channel.id}>\nPing sent to <@&${ROLE_IDS.infernal}>!`,
+        color: 0x9932CC // deep purple
+      });
+      await message.channel.send({ embeds: [embed] });
+      if (logChannel) logChannel.send({ embeds: [embed] });
       console.log(`📣 Pinged <@&${ROLE_IDS.infernal}>`);
       pinged = true;
     }
   }
-});
 
-// Logs
-client.on('messageUpdate', (oldMsg, newMsg) => {
-  if (oldMsg.content !== newMsg.content) {
-    console.log(`[Edited] ${oldMsg.author?.tag}: "${oldMsg.content}" ➜ "${newMsg.content}"`);
+  // ----- Chat Logging -----
+  if (!pinged && logChannel && message.channel.id !== LOG_CHANNEL_ID) {
+    logChannel.send({ embeds: [createLogEmbed({
+      title: "💬 Message Sent",
+      description: `**User:** ${message.author.tag}\n**Channel:** <#${message.channel.id}>\n**Content:** ${message.content || "*No text*"}`,
+      color: 0x1ABC9C // teal/cyan
+    })] });
   }
 });
-client.on('messageDelete', (msg) => {
-  console.log(`[Deleted] ${msg.author?.tag}: ${msg.content}`);
-});
 
-client.once('ready', () => {
-  console.log(`🟢 Logged in as ${client.user.tag}`);
-});
-
-
-
-// ==========================================================
-// ===============  🔵  FULL LOGGING SYSTEM  🔵  ==============
-// ==========================================================
-
-const LOG_CHANNEL_ID = "1447027328600379392";
-
-// Bot ready event (startup)
-client.once("ready", async () => {
-  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-  if (logChannel) {
-    logChannel.send(`🟢 **Bot started successfully** at <t:${Math.floor(Date.now()/1000)}:T>`);
-  }
-  console.log("Logging system active.");
-});
-
-// Reconnecting
-client.on("reconnecting", () => {
-  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-  if (logChannel) logChannel.send("🔄 **Bot reconnecting to Discord...**");
-});
-
-// Disconnect
-client.on("disconnect", () => {
-  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-  if (logChannel) logChannel.send("🔴 **Bot disconnected from Discord!**");
-});
-
-// A) CHAT LOGGING
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  if (!message.guild) return;
-  if (message.channel.id === LOG_CHANNEL_ID) return;
-
-  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-  if (!logChannel) return;
-
-  logChannel.send({
-    content: `💬 **Message Sent**  
-**User:** ${message.author.tag}  
-**Channel:** <#${message.channel.id}>  
-**Content:** ${message.content || "*No text*"}`
-  });
-});
-
-// B1) MESSAGE DELETE
-client.on("messageDelete", async (message) => {
-  if (!message.guild || message.author?.bot) return;
-
-  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-  if (!logChannel) return;
-
-  logChannel.send({
-    content: `🗑️ **Message Deleted**  
-**User:** ${message.author?.tag || "Unknown"}  
-**Channel:** <#${message.channel.id}>  
-**Content:** ${message.content || "*No text*"}`
-  });
-});
-
-// B2) MESSAGE EDITED
+// ----- Message Edited -----
 client.on("messageUpdate", async (oldMsg, newMsg) => {
   if (!newMsg.guild || newMsg.author?.bot) return;
   if (oldMsg.content === newMsg.content) return;
 
   const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
-  if (!logChannel) return;
-
-  logChannel.send({
-    content: `✏️ **Message Edited**  
-**User:** ${newMsg.author.tag}  
-**Channel:** <#${newMsg.channel.id}>  
-
-**Before:** ${oldMsg.content || "*No text*"}  
-**After:** ${newMsg.content || "*No text*"}`
-  });
+  if (logChannel) logChannel.send({ embeds: [createLogEmbed({
+    title: "✏️ Message Edited",
+    description: `**User:** ${newMsg.author.tag}\n**Channel:** <#${newMsg.channel.id}>\n\n**Before:** ${oldMsg.content || "*No text*"}\n**After:** ${newMsg.content || "*No text*"}`,
+    color: 0xF1C40F // yellow
+  })] });
 });
 
-// B3) USER JOIN
+// ----- Message Deleted -----
+client.on("messageDelete", async (message) => {
+  if (!message.guild || message.author?.bot) return;
+
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) logChannel.send({ embeds: [createLogEmbed({
+    title: "🗑️ Message Deleted",
+    description: `**User:** ${message.author?.tag || "Unknown"}\n**Channel:** <#${message.channel.id}>\n**Content:** ${message.content || "*No text*"}`,
+    color: 0xE74C3C // red
+  })] });
+});
+
+// ----- User Join -----
 client.on("guildMemberAdd", (member) => {
   const logChannel = member.guild.channels.cache.get(LOG_CHANNEL_ID);
-  if (logChannel) logChannel.send(`📥 **User Joined:** ${member.user.tag}`);
+  if (logChannel) logChannel.send({ embeds: [createLogEmbed({
+    title: "📥 User Joined",
+    description: `${member.user.tag} joined the server.`,
+    color: 0xD8BFD8 // light purple
+  })] });
 });
 
-// B4) USER LEAVE
+// ----- User Leave -----
 client.on("guildMemberRemove", (member) => {
   const logChannel = member.guild.channels.cache.get(LOG_CHANNEL_ID);
-  if (logChannel) logChannel.send(`📤 **User Left:** ${member.user.tag}`);
+  if (logChannel) logChannel.send({ embeds: [createLogEmbed({
+    title: "📤 User Left",
+    description: `${member.user.tag} left the server.`,
+    color: 0xE67E22 // orange
+  })] });
 });
 
+// ----- Bot Events -----
+client.once("ready", async () => {
+  console.log(`🟢 Logged in as ${client.user.tag}`);
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) logChannel.send({ embeds: [createLogEmbed({
+    title: "🟢 Bot Started",
+    description: `Logged in as **${client.user.tag}**`,
+    color: 0x4B0082 // dark purple
+  })] });
+});
+
+client.on("reconnecting", () => {
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) logChannel.send({ embeds: [createLogEmbed({
+    title: "🔄 Bot Reconnecting",
+    description: "Attempting to reconnect to Discord...",
+    color: 0x4B0082 // dark purple
+  })] });
+});
+
+client.on("disconnect", () => {
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) logChannel.send({ embeds: [createLogEmbed({
+    title: "🔴 Bot Disconnected",
+    description: "Bot has disconnected from Discord!",
+    color: 0x4B0082 // dark purple
+  })] });
+});
 
 // ==========================================================
 // ===================== END LOGGING SYSTEM =================
 // ==========================================================
-
 
 client.login(process.env.DISCORD_BOT_TOKEN);
