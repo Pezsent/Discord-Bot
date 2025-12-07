@@ -109,4 +109,101 @@ client.once('ready', () => {
   console.log(`🟢 Logged in as ${client.user.tag}`);
 });
 
+
+
+// ==========================================================
+// ===============  🔵  FULL LOGGING SYSTEM  🔵  ==============
+// ==========================================================
+
+const LOG_CHANNEL_ID = "1447027328600379392";
+
+// Bot ready event (startup)
+client.once("ready", async () => {
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) {
+    logChannel.send(`🟢 **Bot started successfully** at <t:${Math.floor(Date.now()/1000)}:T>`);
+  }
+  console.log("Logging system active.");
+});
+
+// Reconnecting
+client.on("reconnecting", () => {
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) logChannel.send("🔄 **Bot reconnecting to Discord...**");
+});
+
+// Disconnect
+client.on("disconnect", () => {
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) logChannel.send("🔴 **Bot disconnected from Discord!**");
+});
+
+// A) CHAT LOGGING
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+  if (!message.guild) return;
+  if (message.channel.id === LOG_CHANNEL_ID) return;
+
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (!logChannel) return;
+
+  logChannel.send({
+    content: `💬 **Message Sent**  
+**User:** ${message.author.tag}  
+**Channel:** <#${message.channel.id}>  
+**Content:** ${message.content || "*No text*"}`
+  });
+});
+
+// B1) MESSAGE DELETE
+client.on("messageDelete", async (message) => {
+  if (!message.guild || message.author?.bot) return;
+
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (!logChannel) return;
+
+  logChannel.send({
+    content: `🗑️ **Message Deleted**  
+**User:** ${message.author?.tag || "Unknown"}  
+**Channel:** <#${message.channel.id}>  
+**Content:** ${message.content || "*No text*"}`
+  });
+});
+
+// B2) MESSAGE EDITED
+client.on("messageUpdate", async (oldMsg, newMsg) => {
+  if (!newMsg.guild || newMsg.author?.bot) return;
+  if (oldMsg.content === newMsg.content) return;
+
+  const logChannel = client.channels.cache.get(LOG_CHANNEL_ID);
+  if (!logChannel) return;
+
+  logChannel.send({
+    content: `✏️ **Message Edited**  
+**User:** ${newMsg.author.tag}  
+**Channel:** <#${newMsg.channel.id}>  
+
+**Before:** ${oldMsg.content || "*No text*"}  
+**After:** ${newMsg.content || "*No text*"}`
+  });
+});
+
+// B3) USER JOIN
+client.on("guildMemberAdd", (member) => {
+  const logChannel = member.guild.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) logChannel.send(`📥 **User Joined:** ${member.user.tag}`);
+});
+
+// B4) USER LEAVE
+client.on("guildMemberRemove", (member) => {
+  const logChannel = member.guild.channels.cache.get(LOG_CHANNEL_ID);
+  if (logChannel) logChannel.send(`📤 **User Left:** ${member.user.tag}`);
+});
+
+
+// ==========================================================
+// ===================== END LOGGING SYSTEM =================
+// ==========================================================
+
+
 client.login(process.env.DISCORD_BOT_TOKEN);
